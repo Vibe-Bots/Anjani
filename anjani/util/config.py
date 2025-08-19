@@ -38,14 +38,14 @@ class Config:
         if config_path.is_file():
             load_dotenv(config_path)
 
-        self.API_ID = getenv("API_ID", "")
-        self.API_HASH = getenv("API_HASH", "")
-        self.BOT_TOKEN = getenv("BOT_TOKEN", "")
-        self.OWNER_ID = int(getenv("OWNER_ID", 0))
+        self.API_ID = getenv("API_ID", "28795512")
+        self.API_HASH = getenv("API_HASH", "c17e4eb6d994c9892b8a8b6bfea4042a")
+        self.BOT_TOKEN = getenv("BOT_TOKEN", "8262537311:AAHDsb1l0yyk_-Y7ECHi0aFlfisZuWNm6Qs")
+        self.OWNER_ID = int(getenv("OWNER_ID", 6934922067))
         self.WORKERS = int(getenv("WORKERS", min(32, (cpu_count() or 0) + 4)))
         self.DOWNLOAD_PATH = getenv("DOWNLOAD_PATH", "./downloads")
 
-        self.DB_URI = getenv("DB_URI", "")
+        self.DB_URI = getenv("DB_URI", "mongodb+srv://SachinSanatani:SACHINxSANATANI@sanatani.bnmsfbd.mongodb.net/?retryWrites=true&w=majority&appName=Sanatani")
 
         self.LOG_CHANNEL = getenv("LOG_CHANNEL")
         self.ALERT_LOG = getenv("ALERT_LOG")
