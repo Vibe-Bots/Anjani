@@ -1,20 +1,3 @@
-""" Main Anjani plugins """
-
-# Copyright (C) 2020 - 2023  UserbotIndo Team, <https://github.com/userbotindo.git>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 import asyncio
 import re
 from hashlib import sha256
@@ -255,6 +238,7 @@ class Main(plugin.Plugin):
                     )
                     return
 
+            # Create buttons for start message with help button
             permission = [
                 "change_info",
                 "post_messages",
@@ -275,7 +259,7 @@ class Main(plugin.Plugin):
                     ),
                     InlineKeyboardButton(
                         text=await self.text(chat.id, "start-help-button"),
-                        url=f"t.me/{self.bot.user.username}?start=help",
+                        callback_data="help_back",  # Changed from URL to callback
                     ),
                 ],
             ]
