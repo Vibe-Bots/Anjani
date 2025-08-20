@@ -136,10 +136,70 @@ class Main(plugin.Plugin):
                 )
         plugins.sort(key=lambda kb: kb.text)
 
-        pairs = [plugins[i * 3 : (i + 1) * 3] for i in range((len(plugins) + 3 - 1) // 3)]
-        pairs.append([InlineKeyboardButton("✗ Close", callback_data="help_close")])
+        # Organize plugins into categories for better organization
+        categories = {}
+        for plugin_btn in plugins:
+            # Extract category from plugin name (assuming format "category_plugin" or similar)
+            category = plugin_btn.text.split()[0] if ' ' in plugin_btn.text else "General"
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(plugin_btn)
 
-        return pairs
+        # Create category buttons
+        category_buttons = []
+        for category in sorted(categories.keys()):
+            category_buttons.append(
+                InlineKeyboardButton(
+                    f"📁 {category}",
+                    callback_data=f"help_category({category})"
+                )
+            )
+
+        # Organize category buttons in rows of 2
+        category_rows = [category_buttons[i:i+2] for i in range(0, len(category_buttons), 2)]
+        
+        # Add main menu and close buttons
+        category_rows.append([
+            InlineKeyboardButton("🏠 Main Menu", callback_data="help_back"),
+            InlineKeyboardButton("✗ Close", callback_data="help_close")
+        ])
+
+        return category_rows
+
+    async def get_plugin_help(self, plugin_name: str, chat_id: int) -> str:
+        """Get help text for a specific plugin"""
+        text_lang = await self.text(chat_id, f"{plugin_name}-help", username=self.bot.user.username)
+        return (
+            f"Here is the help for the **{plugin_name.capitalize()}** "
+            f"plugin:\n\n{text_lang}"
+        )
+
+    async def get_category_help(self, category: str, chat_id: int) -> List[List[InlineKeyboardButton]]:
+        """Get plugins for a specific category"""
+        plugins: List[InlineKeyboardButton] = []
+        for plug in list(self.bot.plugins.values()):
+            if plug.helpable:
+                plugin_category = await self.text(chat_id, f"{plug.name.lower()}-category", "General")
+                if plugin_category == category:
+                    plugins.append(
+                        InlineKeyboardButton(
+                            await self.text(chat_id, f"{plug.name.lower()}-button"),
+                            callback_data=f"help_plugin({plug.name.lower()})",
+                        )
+                    )
+        
+        plugins.sort(key=lambda kb: kb.text)
+        
+        # Organize plugins in rows of 2
+        plugin_rows = [plugins[i:i+2] for i in range(0, len(plugins), 2)]
+        
+        # Add back button
+        plugin_rows.append([
+            InlineKeyboardButton("🔙 Back", callback_data="help_back"),
+            InlineKeyboardButton("✗ Close", callback_data="help_close")
+        ])
+        
+        return plugin_rows
 
     @listener.filters(filters.regex(r"help_(.*)"))
     async def on_callback_query(self, query: CallbackQuery) -> None:
@@ -162,18 +222,23 @@ class Main(plugin.Plugin):
                 await query.message.delete()
             except MessageDeleteForbidden:
                 await query.answer("I can't delete the message")
-        elif match:
+        elif match.startswith("category("):
+            category = match.replace("category(", "").replace(")", "")
+            keyboard = await self.get_category_help(category, chat.id)
+            try:
+                await query.edit_message_text(
+                    f"**{category} Plugins**\n\nSelect a plugin to view its help:",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            except MessageNotModified:
+                pass
+        elif match.startswith("plugin("):
             plug = re.compile(r"plugin\((\w+)\)").match(match)
             if not plug:
                 raise ValueError("Unable to find plugin name")
 
-            text_lang = await self.text(
-                chat.id, f"{plug.group(1)}-help", username=self.bot.user.username
-            )
-            text = (
-                f"Here is the help for the **{plug.group(1).capitalize()}** "
-                f"plugin:\n\n{text_lang}"
-            )
+            text = await self.get_plugin_help(plug.group(1), chat.id)
             try:
                 await query.edit_message_text(
                     text,
@@ -181,13 +246,18 @@ class Main(plugin.Plugin):
                         [
                             [
                                 InlineKeyboardButton(
-                                    await self.text(chat.id, "back-button"),
+                                    "🔙 Back",
                                     callback_data="help_back",
+                                ),
+                                InlineKeyboardButton(
+                                    "✗ Close",
+                                    callback_data="help_close",
                                 )
                             ]
                         ]
                     ),
                     parse_mode=ParseMode.MARKDOWN,
+                    disable_web_page_preview=True,
                 )
             except MessageNotModified:
                 pass
@@ -216,11 +286,7 @@ class Main(plugin.Plugin):
 
                 help_re = re.compile(r"help_(.*)").match(ctx.input)
                 if help_re:
-                    text_lang = await self.text(chat.id, f"{help_re.group(1)}-help")
-                    text = (
-                        f"Here is the help for the **{ctx.input.capitalize().replace('help_', '')}** "
-                        f"plugin:\n\n{text_lang}"
-                    )
+                    text = await self.get_plugin_help(help_re.group(1), chat.id)
                     await ctx.respond(
                         text,
                         reply_markup=InlineKeyboardMarkup(
@@ -229,6 +295,10 @@ class Main(plugin.Plugin):
                                     InlineKeyboardButton(
                                         await self.text(chat.id, "back-button"),
                                         callback_data="help_back",
+                                    ),
+                                    InlineKeyboardButton(
+                                        "✗ Close",
+                                        callback_data="help_close",
                                     )
                                 ]
                             ]
@@ -238,7 +308,6 @@ class Main(plugin.Plugin):
                     )
                     return
 
-            # Create buttons for start message with help button
             permission = [
                 "change_info",
                 "post_messages",
@@ -259,7 +328,7 @@ class Main(plugin.Plugin):
                     ),
                     InlineKeyboardButton(
                         text=await self.text(chat.id, "start-help-button"),
-                        callback_data="help_back",  # Changed from URL to callback
+                        url=f"t.me/{self.bot.user.username}?start=help",
                     ),
                 ],
             ]
@@ -276,6 +345,14 @@ class Main(plugin.Plugin):
                         ),
                     ]
                 )
+            
+            # Add help button to start menu
+            buttons.append([
+                InlineKeyboardButton(
+                    text=await self.text(chat.id, "help-button"),
+                    callback_data="help_back"
+                )
+            ])
 
             await ctx.respond(
                 await self.text(chat.id, "start-pm", self.bot_name),
@@ -313,12 +390,35 @@ class Main(plugin.Plugin):
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
+    async def cmd_quickhelp(self, ctx: command.Context) -> None:
+        """Quick help command with basic instructions"""
+        chat = ctx.chat
+        
+        quick_help_text = await self.text(chat.id, "quick-help", self.bot_name)
+        
+        if chat.type == ChatType.PRIVATE:
+            await ctx.respond(
+                quick_help_text,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(
+                        "📚 Full Help Menu", 
+                        callback_data="help_back"
+                    )]
+                ]),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        else:
+            await ctx.respond(
+                quick_help_text,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
     async def cmd_privacy(self, ctx: command.Context) -> None:
         """Bot privacy command"""
         await ctx.respond(
             await self.text(ctx.chat.id, "privacy"),
             reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Privacy Prolicy", url="https://userbotindo.com/privacy")]]
+                [[InlineKeyboardButton("Privacy Policy", url="https://userbotindo.com/privacy")]]
             ),
         )
 
